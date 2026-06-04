@@ -104,3 +104,4 @@ PC Host `.env`: `STUDENT_MCP_URL=http://<pi-ip>:8100/mcp`
 - `systemd/hdt-student.service` — `@PYTHON_EXEC@` 치환
 
 이 Pi에 `mediapipe`를 **미리** apt/pip 하지 마세요. OTA 후 expert 패키지 `pip_deps`로 설치합니다.
+

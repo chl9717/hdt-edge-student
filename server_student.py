@@ -153,6 +153,27 @@ async def activate_module(ctx: Context, module_id: str) -> str:
 
 
 @mcp.tool()
+async def start_domain_inference(ctx: Context, domain: str) -> str:
+    """Start pose or emotion inference on an activated expert module (pose | emotion)."""
+    result = module_loader.run_domain_action(domain, "start")
+    return json.dumps(result, ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
+async def stop_domain_inference(ctx: Context, domain: str) -> str:
+    """Stop pose or emotion inference (pose | emotion)."""
+    result = module_loader.run_domain_action(domain, "stop")
+    return json.dumps(result, ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
+async def get_domain_inference_status(ctx: Context, domain: str) -> str:
+    """Status for activated pose or emotion module (pose | emotion)."""
+    result = module_loader.run_domain_action(domain, "status")
+    return json.dumps(result, ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
 async def uninstall_module(ctx: Context, module_id: str) -> str:
     """Remove an installed expert package by id."""
     result = module_loader.uninstall(module_id)
@@ -167,7 +188,7 @@ def student_provisioning_workflow() -> str:
     2. Transfer expert package (.zip or folder) to the Pi (scp/rsync).
     3. Call install_module with the local path on the Pi.
     4. Call list_installed_modules to verify manifest id and version.
-    5. Call activate_module then start_pose_inference / start_emotion_inference.
+    5. Call activate_module then start_domain_inference(domain) or legacy start_* tools.
     """
 
 

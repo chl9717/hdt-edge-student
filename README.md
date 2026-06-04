@@ -11,18 +11,9 @@ GitHub 프로젝트처럼 **clone → install 한 번**으로 세팅합니다.
 
 ### 1) 저장소 받기
 
-**전용 repo만 쓸 때 (권장):**
-
 ```bash
-git clone https://github.com/<your-org>/hdt-edge-student.git
+git clone https://github.com/chl9717/hdt-edge-student.git
 cd hdt-edge-student
-```
-
-**모노레포(`Projects_2`)에서 이 폴더만 쓸 때:**
-
-```bash
-git clone https://github.com/<your-org>/Projects_2.git
-cd Projects_2/hdt-edge-student
 ```
 
 ### 2) 한 번에 설치

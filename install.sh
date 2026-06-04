@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # One-shot setup for HDT Empty Student Agent (Raspberry Pi).
 # Usage:
-#   git clone <repo-url> hdt-edge-student && cd hdt-edge-student
+#   git clone https://github.com/chl9717/hdt-edge-student.git && cd hdt-edge-student
 #   ./install.sh
 #   ./install.sh --systemd
 #   ./install.sh --no-apt    # skip apt packages (venv/pip only)
@@ -31,7 +31,7 @@ for arg in "$@"; do
   esac
 done
 
-echo "=== HDT Student Agent — install ==="
+echo "=== HDT Student Agent - install ==="
 echo "Directory: $SCRIPT_DIR"
 
 if [[ "$(uname -s)" != "Linux" ]]; then
@@ -60,11 +60,31 @@ fi
 # shellcheck disable=SC1091
 source .venv/bin/activate
 pip install --upgrade pip -q
-pip install -r requirements.txt -q
+if ! pip install -r requirements.txt -q; then
+  echo "-> pip install failed; retrying once..."
+  pip install -r requirements.txt
+fi
+
+write_default_env() {
+  cat > .env << 'EOF'
+MCP_HOST=0.0.0.0
+MCP_PORT=8100
+PACKAGES_DIR=./packages
+STUDENT_ID=hdt-student-01
+EOF
+}
 
 if [[ ! -f .env ]]; then
-  cp .env.example .env
-  echo "-> Created .env from .env.example"
+  if [[ -f .env.example ]]; then
+    cp .env.example .env
+    echo "-> Created .env from .env.example"
+  elif [[ -f env.example ]]; then
+    cp env.example .env
+    echo "-> Created .env from env.example"
+  else
+    write_default_env
+    echo "-> Created .env with defaults (.env.example not in repo)"
+  fi
 else
   echo "-> Keeping existing .env"
 fi
@@ -80,8 +100,9 @@ if [[ $INSTALL_SYSTEMD -eq 1 ]]; then
     echo "Error: missing $SERVICE_SRC"
     exit 1
   fi
-  echo "-> Installing systemd unit..."
-  sudo sed "s|@INSTALL_DIR@|$SCRIPT_DIR|g" "$SERVICE_SRC" | sudo tee "$SERVICE_DST" >/dev/null
+  echo "-> Installing systemd unit (user: ${USER})..."
+  sudo sed -e "s|@INSTALL_DIR@|$SCRIPT_DIR|g" -e "s|@INSTALL_USER@|$USER|g" \
+    "$SERVICE_SRC" | sudo tee "$SERVICE_DST" >/dev/null
   sudo systemctl daemon-reload
   sudo systemctl enable hdt-student.service
   sudo systemctl restart hdt-student.service

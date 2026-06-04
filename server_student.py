@@ -139,9 +139,16 @@ async def install_module_from_url(ctx: Context, package_url: str) -> str:
 
 
 @mcp.tool()
+async def install_package_dependencies(ctx: Context, module_id: str) -> str:
+    """pip install deps from package manifest (opencv, mediapipe, etc.)."""
+    result = module_loader.install_pip_deps(module_id)
+    return json.dumps(result, ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
 async def activate_module(ctx: Context, module_id: str) -> str:
-    """Hot-load installed package and register domain MCP tools (pose/emotion)."""
-    result = module_loader.activate(mcp, module_id)
+    """Install pip deps from manifest, hot-load package, register pose/emotion MCP tools."""
+    result = module_loader.activate(mcp, module_id, install_deps=True)
     return json.dumps(result, ensure_ascii=False, indent=2)
 
 
@@ -166,3 +173,4 @@ def student_provisioning_workflow() -> str:
 
 if __name__ == "__main__":
     mcp.run(transport="streamable-http")
+

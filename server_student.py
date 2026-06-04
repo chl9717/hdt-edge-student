@@ -132,6 +132,20 @@ async def install_module(ctx: Context, source_path: str) -> str:
 
 
 @mcp.tool()
+async def install_module_from_url(ctx: Context, package_url: str) -> str:
+    """Download and install an expert package zip from the Host PC HTTP server."""
+    result = module_loader.install_from_url(package_url)
+    return json.dumps(result, ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
+async def activate_module(ctx: Context, module_id: str) -> str:
+    """Hot-load installed package and register domain MCP tools (pose/emotion)."""
+    result = module_loader.activate(mcp, module_id)
+    return json.dumps(result, ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
 async def uninstall_module(ctx: Context, module_id: str) -> str:
     """Remove an installed expert package by id."""
     result = module_loader.uninstall(module_id)
@@ -146,7 +160,7 @@ def student_provisioning_workflow() -> str:
     2. Transfer expert package (.zip or folder) to the Pi (scp/rsync).
     3. Call install_module with the local path on the Pi.
     4. Call list_installed_modules to verify manifest id and version.
-    5. (Phase 2) Reconnect Host MCP session to pick up hot-loaded domain tools.
+    5. Call activate_module then start_pose_inference / start_emotion_inference.
     """
 
 

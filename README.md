@@ -5,6 +5,9 @@
 
 GitHub 프로젝트처럼 **clone → install 한 번**으로 세팅합니다.
 
+**Python 3.11 필수** — Host가 OTA로 넣는 pose 패키지(`hdt-edge-pose` / mediapipe)는 3.12+에서 동작하지 않습니다.  
+학생 Pi는 **처음부터 3.11 venv**로 설치하세요 (3.13 기본 OS면 `install.sh`가 3.11을 찾거나 apt로 설치 시도).
+
 ---
 
 ## 빠른 설치 (Raspberry Pi)
@@ -21,6 +24,17 @@ cd hdt-edge-student
 ```bash
 chmod +x install.sh
 ./install.sh --systemd
+```
+
+이미 **Python 3.13** 으로 설치했다면 venv를 지우고 다시:
+
+```bash
+cd ~/hdt-edge-student
+sudo systemctl stop hdt-student 2>/dev/null || true
+rm -rf .venv
+sudo apt install -y python3.11 python3.11-venv
+./install.sh --no-apt --systemd
+.venv/bin/python --version   # Python 3.11.x 확인
 ```
 
 | 옵션 | 설명 |
@@ -71,7 +85,21 @@ STUDENT_MCP_URL=http://192.168.0.120:8100/mcp
 | `student://status` | 에이전트 상태 |
 | `student://modules` | 설치된 모듈 목록 |
 
-**Phase 2:** `install_module` 후 `importlib`로 MCP 도구 hot-load → Host 세션 재연결.
+`install_module_from_url`, `activate_module` — Host/Librarian OTA 후 hot-load.
+
+---
+
+## 3-agent 흐름 (PC + Pi)
+
+사용자가 Host에게 **「자세 추정이 필요해」** 라고 하면:
+
+1. **Host** — Student `get_device_info` (선택, 카메라·Python 확인)
+2. **Host → Librarian MCP** — `get_package_download_url(domain=pose)`  
+   - Librarian이 **`hdt-edge-pose`** 로부터 zip 생성·URL 반환 (= 무엇을 “가르칠지”)
+3. **Host → Student MCP** — `install_module_from_url(url)` → `activate_module` → `start_pose_inference`
+4. **Student** — 패키지 설치·구동 (추론은 Student Pi에서)
+
+표정이면 동일하게 **`hdt-edge-emotion`** 패키지.
 
 ---
 

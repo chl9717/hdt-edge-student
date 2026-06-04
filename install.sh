@@ -41,20 +41,44 @@ fi
 if [[ $RUN_APT -eq 1 ]] && command -v apt-get >/dev/null 2>&1; then
   echo "-> Installing system packages (sudo)..."
   sudo apt-get update -qq
-  sudo apt-get install -y python3 python3-venv python3-pip git curl v4l-utils
+  sudo apt-get install -y python3.11 python3.11-venv python3-pip git curl v4l-utils \
+    || sudo apt-get install -y python3 python3-venv python3-pip git curl v4l-utils
 fi
 
-if ! command -v python3 >/dev/null 2>&1; then
-  echo "Error: python3 not found."
+# Pose expert (mediapipe) needs Python 3.11 — not 3.12+
+PYTHON_BIN=""
+for candidate in python3.11 python3; do
+  if command -v "$candidate" >/dev/null 2>&1; then
+    minor="$("$candidate" -c 'import sys; print(sys.version_info.minor)')"
+    major="$("$candidate" -c 'import sys; print(sys.version_info.major)')"
+    if [[ "$major" == "3" && "$minor" == "11" ]]; then
+      PYTHON_BIN="$candidate"
+      break
+    fi
+  fi
+done
+
+if [[ -z "$PYTHON_BIN" ]]; then
+  echo "Error: Python 3.11 required (mediapipe on student after OTA)."
+  echo "  sudo apt install python3.11 python3.11-venv"
+  echo "  Or re-flash Pi OS that ships 3.11 as default."
   exit 1
 fi
 
-PYVER="$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
-echo "-> Python $PYVER"
+PYVER="$("$PYTHON_BIN" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
+echo "-> Using $PYTHON_BIN ($PYVER)"
+
+if [[ -d .venv ]]; then
+  venv_py="$(.venv/bin/python -c 'import sys; print(sys.version_info.minor)' 2>/dev/null || echo "")"
+  if [[ "$venv_py" != "11" ]]; then
+    echo "-> Removing old .venv (not Python 3.11)"
+    rm -rf .venv
+  fi
+fi
 
 if [[ ! -d .venv ]]; then
-  echo "-> Creating virtualenv .venv"
-  python3 -m venv .venv
+  echo "-> Creating virtualenv .venv with $PYTHON_BIN"
+  "$PYTHON_BIN" -m venv .venv
 fi
 
 # shellcheck disable=SC1091

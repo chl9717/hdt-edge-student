@@ -6,6 +6,7 @@ import importlib.util
 import json
 import os
 import shutil
+import subprocess
 import sys
 import urllib.request
 import zipfile
@@ -143,7 +144,47 @@ def install_from_url(package_url: str) -> dict[str, Any]:
             tmp.unlink(missing_ok=True)
 
 
-def activate(mcp, module_id: str) -> dict[str, Any]:
+def install_pip_deps(module_id: str) -> dict[str, Any]:
+    """Install manifest pip_deps into the Student conda env (same python as MCP server)."""
+    pkg_dir = packages_root() / module_id
+    manifest = _read_manifest(pkg_dir)
+    if not manifest:
+        return {"ok": False, "error": f"Module not installed or missing manifest: {module_id}"}
+
+    deps = manifest.get("pip_deps") or []
+    if not deps:
+        return {"ok": True, "id": module_id, "installed": [], "note": "no pip_deps in manifest"}
+
+    cmd = [
+        sys.executable,
+        "-m",
+        "pip",
+        "install",
+        "--upgrade",
+        *deps,
+    ]
+    try:
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=int(os.getenv("PIP_INSTALL_TIMEOUT", "900")),
+        )
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "error": "pip install timed out", "deps": deps}
+
+    ok = proc.returncode == 0
+    return {
+        "ok": ok,
+        "id": module_id,
+        "deps": deps,
+        "returncode": proc.returncode,
+        "stdout_tail": (proc.stdout or "")[-1500:],
+        "stderr_tail": (proc.stderr or "")[-1500:],
+    }
+
+
+def activate(mcp, module_id: str, *, install_deps: bool = True) -> dict[str, Any]:
     """Hot-load expert module.py and register domain MCP tools on this server."""
     if module_id in _activated_ids:
         return {"ok": True, "id": module_id, "already_active": True}
@@ -155,6 +196,15 @@ def activate(mcp, module_id: str) -> dict[str, Any]:
     module_py = pkg_dir / "module.py"
     if not module_py.is_file():
         return {"ok": False, "error": f"Missing module.py in {pkg_dir}"}
+
+    if install_deps:
+        pip_out = install_pip_deps(module_id)
+        if not pip_out.get("ok"):
+            return {
+                "ok": False,
+                "error": "pip dependency install failed",
+                "pip": pip_out,
+            }
 
     pkg_path = str(pkg_dir)
     if pkg_path not in sys.path:
@@ -181,6 +231,7 @@ def activate(mcp, module_id: str) -> dict[str, Any]:
             "id": module_id,
             "domain": (_read_manifest(pkg_dir) or {}).get("domain"),
             "hot_loaded": True,
+            "pip_deps_installed": install_deps,
         }
     except Exception as e:
         return {"ok": False, "error": str(e)}

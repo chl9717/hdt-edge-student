@@ -1,170 +1,106 @@
 # HDT Empty Student Agent
 
-**빈 깡통(Empty Agent)** 라즈베리파이용 MCP 서버입니다.  
-도메인 지식(pose, emotion)은 설치하지 않고, Host가 나중에 `packages/`에 OTA로 넣습니다.
+**빈 깡통(Empty Agent)** 라즈베리파이 MCP 서버.  
+도메인 지식은 Host + Librarian이 OTA로 `packages/`에 넣습니다.
 
-GitHub 프로젝트처럼 **clone → install 한 번**으로 세팅합니다.
-
-**Python 3.11 필수** — Host가 OTA로 넣는 pose 패키지(`hdt-edge-pose` / mediapipe)는 3.12+에서 동작하지 않습니다.  
-학생 Pi는 **처음부터 3.11 venv**로 설치하세요 (3.13 기본 OS면 `install.sh`가 3.11을 찾거나 apt로 설치 시도).
+**권장: Conda 환경 `hdt-student` (Python 3.11)** — Pi OS Trixie처럼 apt에 3.11이 없어도 MediaPipe pose OTA 가능.
 
 ---
 
 ## 빠른 설치 (Raspberry Pi)
 
-### 1) 저장소 받기
+### 1) clone
 
 ```bash
 git clone https://github.com/chl9717/hdt-edge-student.git
 cd hdt-edge-student
 ```
 
-### 2) 한 번에 설치
+### 2) conda (기본, 권장)
+
+**Miniforge가 없을 때 (한 번에):**
 
 ```bash
 chmod +x install.sh
-./install.sh --systemd
+./install.sh --install-miniforge --systemd
 ```
 
-이미 **Python 3.13** 으로 설치했다면 venv를 지우고 다시:
+**이미 conda/miniforge 있을 때:**
 
 ```bash
-cd ~/hdt-edge-student
-sudo systemctl stop hdt-student 2>/dev/null || true
-rm -rf .venv
-sudo apt install -y python3.11 python3.11-venv
-./install.sh --no-apt --systemd
-.venv/bin/python --version   # Python 3.11.x 확인
+./install.sh --systemd
 ```
-
-| 옵션 | 설명 |
-|------|------|
-| (없음) | venv + pip + `.env` 생성, 수동 실행 안내 |
-| `--systemd` | 부팅 시 자동 실행 (`hdt-student.service`) |
-| `--no-apt` | apt 생략 (이미 python3-venv 등 설치된 경우) |
 
 ### 3) 확인
 
 ```bash
-source .venv/bin/activate
+cat .runtime-python
+# ~/miniforge3/envs/hdt-student/bin/python
+
+conda activate hdt-student
+python --version    # 3.11.x
+
+systemctl status hdt-student
+```
+
+수동 실행:
+
+```bash
+conda activate hdt-student
 python server_student.py
-# 다른 터미널 또는 PC에서:
-curl -s http://<pi-ip>:8100/mcp
 ```
-
-PC Host `.env` 예시 (추후 `host_mcp.py` 연동):
-
-```env
-STUDENT_MCP_URL=http://192.168.0.120:8100/mcp
-```
-
-`.env`에서 `STUDENT_ID=hdt-student-01` 로 장치 이름을 구분합니다.
 
 ---
 
-## 이 Pi에 넣지 말 것
+## 설치 옵션
 
-- `hdt-edge-pose` / `hdt-edge-emotion` 전체 복사
-- `mediapipe`, emotion TFLite 등 **도메인** pip 패키지
-- `server_pose.py` / `server_emotion.py`
+| 옵션 | 설명 |
+|------|------|
+| (기본) | `environment.yml` → conda env `hdt-student` |
+| `--install-miniforge` | `~/miniforge3` 설치 후 conda env 생성 |
+| `--systemd` | 부팅 시 자동 실행 |
+| `--venv` | 예전 방식 (apt python3.11 필요) |
+| `--allow-313` | `--venv` + 시스템 3.13 (pose mediapipe 비권장) |
 
 ---
 
-## MCP 도구 (기본 Shell)
+## Python / pose
+
+| 방식 | Pi OS Trixie (3.13) | pose (mediapipe) |
+|------|---------------------|------------------|
+| **conda (기본)** | OK | OK (env 3.11) |
+| venv + Bookworm apt 3.11 | OK | OK |
+| venv + `--allow-313` | MCP만 | 실패 가능 |
+
+---
+
+## 3-agent 흐름
+
+1. **Host** — 사용자 「자세 추정 필요」
+2. **Librarian** — `hdt-edge-pose` → zip URL
+3. **Student** — `install_module_from_url` → `activate_module` → `start_pose_inference`
+
+PC Host `.env`: `STUDENT_MCP_URL=http://<pi-ip>:8100/mcp`
+
+---
+
+## MCP 도구 (Empty shell)
 
 | Tool | 설명 |
 |------|------|
 | `health_check` | 생존 확인 |
-| `get_device_info` | CPU/메모리/Python/카메라(v4l2) |
-| `list_installed_modules` | `packages/` 설치 목록 |
-| `install_module` | 로컬 경로의 zip/폴더 패키지 설치 |
-| `uninstall_module` | 패키지 제거 |
-
-| Resource | 설명 |
-|----------|------|
-| `student://status` | 에이전트 상태 |
-| `student://modules` | 설치된 모듈 목록 |
-
-`install_module_from_url`, `activate_module` — Host/Librarian OTA 후 hot-load.
+| `get_device_info` | 하드웨어 스냅샷 |
+| `install_module_from_url` | Librarian zip OTA |
+| `activate_module` | hot-load |
+| `list_installed_modules` | 설치 목록 |
 
 ---
 
-## 3-agent 흐름 (PC + Pi)
+## GitHub에 올릴 파일
 
-사용자가 Host에게 **「자세 추정이 필요해」** 라고 하면:
+- `environment.yml` — conda 3.11
+- `install.sh` — conda 기본
+- `server_student.py`, `module_loader.py`, `requirements.txt`
+- `systemd/hdt-student.service` — `@PYTHON_EXEC@` 치환
 
-1. **Host** — Student `get_device_info` (선택, 카메라·Python 확인)
-2. **Host → Librarian MCP** — `get_package_download_url(domain=pose)`  
-   - Librarian이 **`hdt-edge-pose`** 로부터 zip 생성·URL 반환 (= 무엇을 “가르칠지”)
-3. **Host → Student MCP** — `install_module_from_url(url)` → `activate_module` → `start_pose_inference`
-4. **Student** — 패키지 설치·구동 (추론은 Student Pi에서)
-
-표정이면 동일하게 **`hdt-edge-emotion`** 패키지.
-
----
-
-## 패키지 설치 흐름 (Host → Student)
-
-1. Host가 expert `.zip`을 Pi에 전송 (`scp`, `rsync`, HTTP 업로드 등).
-2. Pi에서 MCP `install_module` 호출:
-
-   ```json
-   { "source_path": "/home/pi/incoming/pose-estimation-v1.zip" }
-   ```
-
-3. `packages/<id>/` 아래에 `manifest.json` 기준으로展開.
-
-패키지 `manifest.json` 최소 예:
-
-```json
-{
-  "id": "pose-estimation-v1",
-  "domain": "pose",
-  "version": "1.0.0"
-}
-```
-
----
-
-## 수동 실행
-
-```bash
-cd ~/hdt-edge-student
-source .venv/bin/activate
-python server_student.py
-```
-
-포트: **8100** (`MCP_HOST=0.0.0.0`, `MCP_PORT=8100`)
-
-```bash
-sudo ufw allow 8100/tcp
-```
-
----
-
-## systemd
-
-```bash
-./install.sh --systemd
-sudo systemctl status hdt-student
-journalctl -u hdt-student -f
-```
-
-서비스는 `User=pi`, `WorkingDirectory`는 `install.sh`가 치환합니다.  
-다른 사용자면 `systemd/hdt-student.service`의 `User=`를 수정한 뒤 재설치하세요.
-
----
-
-## 디렉터리
-
-```
-hdt-edge-student/
-├── install.sh           # Pi 원클릭 설치
-├── server_student.py    # Empty MCP server
-├── module_loader.py     # packages/ install/list/uninstall
-├── packages/            # OTA 지식 패키지 (git 제외)
-├── requirements.txt
-├── .env.example
-└── systemd/
-    └── hdt-student.service
-```
+이 Pi에 `mediapipe`를 **미리** apt/pip 하지 마세요. OTA 후 expert 패키지 `pip_deps`로 설치합니다.

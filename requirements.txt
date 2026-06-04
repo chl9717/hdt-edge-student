@@ -1,5 +1,5 @@
 # Empty Student Agent — minimal MCP shell (no domain models)
-# Use Python 3.11 venv on Pi (install.sh enforces 3.11 for mediapipe OTA packages)
+# Installed via conda: environment.yml (Python 3.11) or pip in .venv (--venv)
 mcp[cli]>=1.2.0
 python-dotenv>=1.0.0
 uvicorn>=0.30.0

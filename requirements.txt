@@ -1,0 +1,4 @@
+# Empty Student Agent — minimal MCP shell (no domain models)
+mcp[cli]>=1.2.0
+python-dotenv>=1.0.0
+uvicorn>=0.30.0

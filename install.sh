@@ -224,13 +224,28 @@ mkdir -p packages
 chmod +x install.sh 2>/dev/null || true
 
 if [[ $INSTALL_SYSTEMD -eq 1 ]]; then
-  SERVICE_SRC="$SCRIPT_DIR/systemd/hdt-student.service"
   SERVICE_DST="/etc/systemd/system/hdt-student.service"
   echo "-> Installing systemd unit (user: ${USER})..."
-  sudo sed -e "s|@INSTALL_DIR@|$SCRIPT_DIR|g" \
-    -e "s|@INSTALL_USER@|$USER|g" \
-    -e "s|@PYTHON_EXEC@|$PYTHON_EXEC|g" \
-    "$SERVICE_SRC" | sudo tee "$SERVICE_DST" >/dev/null
+  # Write unit directly so old GitHub templates (.venv) cannot break conda installs.
+  sudo tee "$SERVICE_DST" >/dev/null <<EOF
+[Unit]
+Description=HDT Empty Student MCP Agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=${USER}
+WorkingDirectory=${SCRIPT_DIR}
+EnvironmentFile=-${SCRIPT_DIR}/.env
+ExecStart=${PYTHON_EXEC} ${SCRIPT_DIR}/server_student.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  echo "-> systemd ExecStart: $PYTHON_EXEC"
   sudo systemctl daemon-reload
   sudo systemctl enable hdt-student.service
   sudo systemctl restart hdt-student.service
